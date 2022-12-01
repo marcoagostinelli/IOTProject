@@ -33,29 +33,25 @@ smtpobject = smtplib.SMTP(server, 587)
 smtpobject.starttls()
 smtpobject.login(email_sender,sender_password)
 
-#pin1 -> LED   tpin -> DHT11
-pin1 = 22;
-tpin = 35;
-motor_enable = 15;
-motor_turn = 13;
+#tpin -> DHT11
+tpin = 35; #GPIO 19
+motor_enable = 15; #GPIO 22
+motor_turn = 13; #GPIO 27
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BOARD)
-GPIO.setup(pin1,GPIO.OUT)
 GPIO.setup(motor_enable,GPIO.OUT)
 GPIO.setup(motor_turn,GPIO.OUT)
 dht = DHT.DHT(tpin)
-
+GPIO.output(motor_enable, GPIO.LOW)
 
 app.layout = html.Div([
         #temp/hum
+        dcc.Interval(id = "time"),
         html.H1(children="IOT Dashboard"),
-        html.Button('Turn on light',id='btn-lightOn', n_clicks=0),
-        html.Button('Turn off light',id='btn-lightOff', n_clicks=0),
-        html.Button('Get Temperature and Humidity',id='btn-getTemp', n_clicks=0),
         daq.Thermometer(
             id='temperature',
-            value=4,
+            value=0,
             label="Current Temperature",
             labelPosition='top',
             max=50
@@ -67,7 +63,7 @@ app.layout = html.Div([
             label="Current Humidity",
             labelPosition='top',
             max=100,
-            value=4
+            value=0
             ),
         #mqtt pub/sub
         dash_mqtt.DashMqtt(
@@ -91,11 +87,11 @@ app.layout = html.Div([
 @app.callback(
     Output('temperature','value'),
     Output('humidity','value'),
-    Input('btn-getTemp', 'n_clicks')
+    Input('time', 'n_intervals')
 )
 
-def getTemp():
-        chk = dht.readDHT11()
+def getTemp(data):
+        dht.readDHT11()
         temp = dht.temperature
         humi = dht.humidity
         
@@ -106,7 +102,7 @@ def getTemp():
             smtpobject.sendmail(email_sender, email_receiver, message)
             time.sleep(2)
             checkEmailReply()
-        return(temp,humi)
+        return (temp,humi);
    
 @app.callback(
         Output('mqtt', 'message'),
@@ -150,4 +146,4 @@ def checkEmailReply():
         GPIO.output(motor_turn, GPIO.HIGH)
         
 if __name__ == "__main__":
-    app.run_server(debug=False)
+    app.run_server(debug=True)

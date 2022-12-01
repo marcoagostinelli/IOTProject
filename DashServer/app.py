@@ -8,7 +8,7 @@ import time
 
 app = Dash(__name__)
 #tpin -> DHT11
-tpin = 11;
+tpin = 35; #GPIO 19
 GPIO.setwarnings(False)
 dht = DHT.DHT(tpin)
 
@@ -26,8 +26,8 @@ smtpobject = smtplib.SMTP(server, 587)
 smtpobject.starttls()
 smtpobject.login(email_sender,sender_password)
 
-motor_enable = 15;
-motor_turn = 13;
+motor_enable = 15; #GPIO 22
+motor_turn = 13; #GPIO 27
 
 GPIO.setup(motor_enable,GPIO.OUT)
 GPIO.setup(motor_turn,GPIO.OUT)
@@ -92,14 +92,16 @@ def checkEmailReply():
                 
     #if the search did not find a YES response...
     if (emails == ''):
-        print('user does not want fan')  
+        print('user does not want fan')
+        return();
     #else delete the message once it has been processed by the program
     else:
         mb.delete(emailId)
         print('turn on fan')
         GPIO.output(motor_enable, GPIO.HIGH)
         GPIO.output(motor_turn, GPIO.HIGH)
-        
+        return()
+
     
 if __name__ == "__main__":
     app.run_server(debug=True)
