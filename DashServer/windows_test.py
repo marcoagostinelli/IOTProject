@@ -27,6 +27,8 @@ smtpobject.login(email_sender,sender_password)
 #login to the sender inbox
 mb = MailBox(inbox_server).login(email_sender, sender_password)
 
+#keepFanOff will be true if the user manually turned off the fan (the fan will no longer turn on by itself)
+keepFanOff = False
 isFanOn = False
 motor_enable = 15; #GPIO 22
 motor_turn = 13; #GPIO 27
@@ -51,7 +53,12 @@ app.layout = html.Div(
                     labelPosition='top',
                     max=50 
                     ) ,
-                    html.Img(style={'width':'90%','height':'90%','margin-top':'50px'},src=app.get_asset_url('fan_off.png'))
+                    html.Button(
+                        style={'margin-top':'50px'}, 
+                        id='turnOffFan', 
+                        n_clicks=0,
+                        children=[html.Img(src='/assets/fan_off.png',  id="fan", style={'width':'100%','height':'100%'})]
+                    )
                 ]
             ),
             html.Div(
@@ -67,13 +74,18 @@ app.layout = html.Div(
         html.Br(),
         html.Br(),
         html.Br(),
-        daq.Gauge(
-            id='humidity',
-            label="Current Humidity",
-            labelPosition='top',
-            max=100,
-            value=0
-            ),
+        html.Div(
+            style={'margin-left':'800px'},
+            children=[
+                daq.Gauge(
+                id='humidity',
+                label="Current Humidity",
+                labelPosition='top',
+                max=100,
+                value=0
+                )
+            ]
+        ),
         html.Br(),
         daq.GraduatedBar(
         style={'left':'50%'},
@@ -86,20 +98,23 @@ app.layout = html.Div(
     )
 
 @app.callback(
+    Output('fan','src'),
     Output('temperature','value'),
     Output('humidity','value'),
-    Input('time', 'n_intervals')
+    Input('time', 'n_intervals'),
+    Input('turnOffFan', 'n_clicks')
 )
-def getTemp(data):
+def getTemp(data, n_clicks):
     global isFanOn
+    global keepFanOff
     #dht.readDHT11()
     #temp = dht.temperature
-    temp = 20
+    temp = 24
     #humi = dht.humidity
     humi = 50
     #if the temp is over 22, send the user a notice
     print(isFanOn, 'isFanOn before')
-    if ((float(temp) > 22) and (isFanOn is False)):
+    if ((float(temp) > 22) and (isFanOn is False) and (keepFanOff is False)):
         message = 'Subject: Temperature Alert\n\nThe temperature of your room is {}, would you like to turn on the fan?\nYou have 1 minute to answer. '.format(temp)
         #send the email
         smtpobject.sendmail(email_sender, email_receiver, message)
@@ -107,10 +122,23 @@ def getTemp(data):
         time.sleep(2)
         #check if the user responded YES, if so turn on the fan
         isFanOn = checkEmailReply()
-    print("displaying data", temp, humi, isFanOn)    
-    return (temp,humi)
-                     
-            
+    print("displaying data", temp, humi, isFanOn) 
+
+    if (isFanOn):
+        #the fan will not be able to be turned on through the button
+        #check if the turn off button was clicked
+        if ("turnOffFan" == ctx.triggered_id):
+            isFanOn = False
+            keepFanOff = True
+            #GPIO.output(motor_enable,GPIO.LOW
+            return ('/assets/fan_off.png', temp, humi)
+        else:
+            #fan is still on
+            return ('/assets/fan_on.png', temp, humi)
+    else:
+        #if fan is off
+        return ('/assets/fan_off.png', temp, humi)
+                         
             
 def checkEmailReply():
     global isFanOn

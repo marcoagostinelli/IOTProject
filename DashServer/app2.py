@@ -33,11 +33,16 @@ smtpobject = smtplib.SMTP(server, 587)
 smtpobject.starttls()
 smtpobject.login(email_sender,sender_password)
 
+#login to the inbox
+mb = MailBox(inbox_server).login(email_sender, sender_password)
+
 #tpin -> DHT11
 tpin = 35; #GPIO 19
 motor_enable = 15; #GPIO 22
 motor_turn = 13; #GPIO 27
 isFanOn = False
+#keepFanOff will be true if the user manually turned off the fan (the fan will no longer turn on by itself)
+keepFanOff = False
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BOARD)
@@ -46,71 +51,101 @@ GPIO.setup(motor_turn,GPIO.OUT)
 dht = DHT.DHT(tpin)
 GPIO.output(motor_enable, GPIO.LOW)
 
-app.layout = html.Div([
-        #temp/hum
+app.layout = html.Div(
+    style={'background-image': 'url("/assets/background.jpg")', 'background-size': 'cover', 'width': '100%', 'height': '100%','position': 'fixed'},
+    children=[
         dcc.Interval(id = "time"),
         html.H1(children="IOT Dashboard"),
-        daq.Thermometer(
-            id='temperature',
-            value=0,
-            label="Current Temperature",
-            labelPosition='top',
-            max=50
+            html.Div(
+                style={'width':'100px', 'float':'left', 'margin-left':'450px','padding':'10px'},
+                children=[
+                    daq.Thermometer(
+                    id='temperature',
+                    value=0,
+                    label="Current Temperature",
+                    labelPosition='top',
+                    max=50 
+                    ) ,
+                    html.Button(
+                        style={'margin-top':'50px'}, 
+                        id='turnOffFan', 
+                        n_clicks=0,
+                        children=[html.Img(src='/assets/fan_off.png',  id="fan", style={'width':'100%','height':'100%'})]
+                    )
+                ]
             ),
+            html.Div(
+                style={'float':'left','margin-top':'50px'},
+                children=[
+                    
+                ]),
         html.Br(),
         html.Br(),
-        daq.Gauge(
-            id='humidity',
-            label="Current Humidity",
-            labelPosition='top',
-            max=100,
-            value=0
-            ),
+        html.Br(),
+        html.Br(),
+        html.Br(),
+        html.Br(),
+        html.Br(),
+        html.Br(),
+        html.Div(
+            style={'margin-left':'800px'},
+            children=[
+                daq.Gauge(
+                id='humidity',
+                label="Current Humidity",
+                labelPosition='top',
+                max=100,
+                value=0
+                )
+            ]
+        ),
+        html.Br(),
         daq.GraduatedBar(
+        style={'left':'50%'},
         id='intensity',
         label="Light Intensity",
         max=100,
         value=0
-        ),
-        #mqtt pub/sub
-        dash_mqtt.DashMqtt(
-        id='mqtt',
-        broker_url=TEST_SERVER,
-        broker_port = TEST_SERVER_PORT,
-        #broker_path = TEST_SERVER_PATH,
-        topics=[MESSAGE_IN_TOPIC]
-        ),
-        html.H1('MQTT echo'),
-        html.P('MQTT echo server to ' + TEST_SERVER + ' on port ' + str(TEST_SERVER_PORT)),
-        dcc.Input(
-            id='message_to_send',
-            placeholder='message to send',
-            debounce = True),
-        html.Button('Send',id='send'),
-        html.Div(id='return_message')
+        )
         ]
     )
 
 @app.callback(
+    Output('fan','src'),
     Output('temperature','value'),
     Output('humidity','value'),
-    Input('time', 'n_intervals')
+    Input('time', 'n_intervals'),
+    Input('turnOffFan', 'n_clicks')
 )
 
-def getTemp(data):
+def getTemp(data,n_clicks):
     global isFanOn
+    global keepFanOff
     dht.readDHT11()
     temp = dht.temperature
     humi = dht.humidity
         
     #if the temp is over 22, send the user a notice
-    if ((float(temp) > 22) and (isFanOn is False)):
+    if ((float(temp) > 22) and (isFanOn is False) and (keepFanOff is False)):
         message = 'Subject: Temperature Alert\n\nThe temperature of your room is {}, would you like to turn on the fan?\nYou have 1 minute to answer. '.format(temp)
         #send the email
         smtpobject.sendmail(email_sender, email_receiver, message)
         time.sleep(2)
-        checkEmailReply()
-    return (temp,humi);
+        isFanOn = checkEmailReply()
+        if (isFanOn):
+            #the fan will not be able to be turned on through the button
+            #check if the turn off button was clicked
+            if ("turnOffFan" == ctx.triggered_id):
+                isFanOn = False
+                keepFanOff = True
+                #GPIO.output(motor_enable,GPIO.LOW
+                return ('/assets/fan_off.png', temp, humi)
+            else:
+                #fan is still on
+                return ('/assets/fan_on.png', temp, humi)
+        else:
+            #if fan is off
+            return ('/assets/fan_off.png', temp, humi)
    
 @app.callback(
         Output('mqtt', 'message'),
@@ -131,28 +166,31 @@ def display_output(n_clicks, message_payload):
 
 def checkEmailReply():
     global isFanOn
-    #login to the inbox
-    mb = MailBox(inbox_server).login(email_sender, sender_password)
-    #search for an email regarding the temature
-    messages = mb.fetch(criteria=AND(subject='Temperature Alert', body='YES', from_= email_receiver))
-    #this will contain YES if user resonded, or will be empty if they didnt
-    emails = ''
-    #this contains the id of the email so it can be deleted
-    emailId = 0
-    for ms in messages:
-        #assign the values
-        emailId = ms.uid
-        emails=ms.text
+    # #search for an email regarding the temature
+    # messages = mb.fetch(criteria=AND(subject='Temperature Alert', body='YES', from_= email_receiver))
+    # #this will contain YES if user resonded, or will be empty if they didnt
+    # emails = ''
+    # #this contains the id of the email so it can be deleted
+    # emailId = 0
+    # for ms in messages:
+    #     #assign the values
+    #     emailId = ms.uid
+    #     emails=ms.text
                 
-    #if the search did not find a YES response...
-    if (emails == ''):
-        print('user does not want fan')  
-    #else delete the message once it has been processed by the program
-    else:
-        mb.delete(emailId)
-        print('turn on fan')
-        GPIO.output(motor_enable, GPIO.HIGH)
-        GPIO.output(motor_turn, GPIO.HIGH)
+    # #if the search did not find a YES response...
+    # if (emails == ''):
+    #     print('user does not want fan')  
+    # #else delete the message once it has been processed by the program
+    # else:
+    #     mb.delete(emailId)
+    #     print('turn on fan')
+    #     GPIO.output(motor_enable, GPIO.HIGH)
+    #     GPIO.output(motor_turn, GPIO.HIGH)
+
+    #User is set to auto-reply YES, so the fan is turned on
+    GPIO.output(motor_enable, GPIO.HIGH)
+    GPIO.output(motor_turn, GPIO.HIGH)
+    return True
         
 if __name__ == "__main__":
     app.run_server(debug=True)
