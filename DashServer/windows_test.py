@@ -36,16 +36,35 @@ motor_turn = 13; #GPIO 27
 #GPIO.setup(motor_turn,GPIO.OUT)
 
 
-app.layout = html.Div([
+app.layout = html.Div(
+    style={'background-image': 'url("/assets/background.jpg")', 'background-size': 'cover', 'width': '100%', 'height': '100%','position': 'fixed'},
+    children=[
         dcc.Interval(id = "time"),
         html.H1(children="IOT Dashboard"),
-        daq.Thermometer(
-            id='temperature',
-            value=0,
-            label="Current Temperature",
-            labelPosition='top',
-            max=50 
+            html.Div(
+                style={'width':'100px', 'float':'left', 'margin-left':'450px','padding':'10px'},
+                children=[
+                    daq.Thermometer(
+                    id='temperature',
+                    value=0,
+                    label="Current Temperature",
+                    labelPosition='top',
+                    max=50 
+                    ) ,
+                    html.Img(style={'width':'90%','height':'90%','margin-top':'50px'},src=app.get_asset_url('fan_off.png'))
+                ]
             ),
+            html.Div(
+                style={'float':'left','margin-top':'50px'},
+                children=[
+                    
+                ]),
+        html.Br(),
+        html.Br(),
+        html.Br(),
+        html.Br(),
+        html.Br(),
+        html.Br(),
         html.Br(),
         html.Br(),
         daq.Gauge(
@@ -55,7 +74,9 @@ app.layout = html.Div([
             max=100,
             value=0
             ),
+        html.Br(),
         daq.GraduatedBar(
+        style={'left':'50%'},
         id='intensity',
         label="Light Intensity",
         max=100,
