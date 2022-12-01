@@ -37,6 +37,7 @@ smtpobject.login(email_sender,sender_password)
 tpin = 35; #GPIO 19
 motor_enable = 15; #GPIO 22
 motor_turn = 13; #GPIO 27
+isFanOn = False
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BOARD)
@@ -65,6 +66,12 @@ app.layout = html.Div([
             max=100,
             value=0
             ),
+        daq.GraduatedBar(
+        id='intensity',
+        label="Light Intensity",
+        max=100,
+        value=0
+        ),
         #mqtt pub/sub
         dash_mqtt.DashMqtt(
         id='mqtt',
@@ -91,18 +98,19 @@ app.layout = html.Div([
 )
 
 def getTemp(data):
-        dht.readDHT11()
-        temp = dht.temperature
-        humi = dht.humidity
+    global isFanOn
+    dht.readDHT11()
+    temp = dht.temperature
+    humi = dht.humidity
         
-        #if the temp is over 22, send the user a notice
-        if (float(temp) > 22):
-            message = 'Subject: Temperature Alert\n\nThe temperature of your room is {}, would you like to turn on the fan?\nYou have 1 minute to answer. '.format(temp)
-            #send the email
-            smtpobject.sendmail(email_sender, email_receiver, message)
-            time.sleep(2)
-            checkEmailReply()
-        return (temp,humi);
+    #if the temp is over 22, send the user a notice
+    if ((float(temp) > 22) and (isFanOn is False)):
+        message = 'Subject: Temperature Alert\n\nThe temperature of your room is {}, would you like to turn on the fan?\nYou have 1 minute to answer. '.format(temp)
+        #send the email
+        smtpobject.sendmail(email_sender, email_receiver, message)
+        time.sleep(2)
+        checkEmailReply()
+    return (temp,humi);
    
 @app.callback(
         Output('mqtt', 'message'),
@@ -122,6 +130,7 @@ def display_output(n_clicks, message_payload):
         }
 
 def checkEmailReply():
+    global isFanOn
     #login to the inbox
     mb = MailBox(inbox_server).login(email_sender, sender_password)
     #search for an email regarding the temature
