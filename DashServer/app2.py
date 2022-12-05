@@ -161,28 +161,12 @@ def display_output(n_clicks, message_payload):
 
 def checkEmailReply():
     global isFanOn
-    # #search for an email regarding the temature
-    # messages = mb.fetch(criteria=AND(subject='Temperature Alert', body='YES', from_= email_receiver))
-    # #this will contain YES if user resonded, or will be empty if they didnt
-    # emails = ''
-    # #this contains the id of the email so it can be deleted
-    # emailId = 0
-    # for ms in messages:
-    #     #assign the values
-    #     emailId = ms.uid
-    #     emails=ms.text
-                
-    # #if the search did not find a YES response...
-    # if (emails == ''):
-    #     print('user does not want fan')  
-    # #else delete the message once it has been processed by the program
-    # else:
-    #     mb.delete(emailId)
-    #     print('turn on fan')
-    #     GPIO.output(motor_enable, GPIO.HIGH)
-    #     GPIO.output(motor_turn, GPIO.HIGH)
-
-    #User is set to auto-reply YES, so the fan is turned on
+    #search for an email regarding the temature
+    messages = mb.fetch(criteria=AND(subject='Temperature Alert', body='YES', from_= email_receiver))
+    #this will contain YES if user resonded, or will be empty if they didnt
+    
+    #auto reply is set to YES so the fan will always turn on
+    print('turn on fan')
     GPIO.output(motor_enable, GPIO.HIGH)
     GPIO.output(motor_turn, GPIO.HIGH)
     return True
