@@ -121,31 +121,26 @@ app.layout = html.Div(
 def getTemp(data,n_clicks):
     global isFanOn
     global keepFanOff
+    #get button info
     dht.readDHT11()
     temp = dht.temperature
     humi = dht.humidity
-        
+    print ("temp is :",temp)
     #if the temp is over 22, send the user a notice
-    if ((float(temp) > 22) and (isFanOn is False) and (keepFanOff is False)):
+    if ((float(temp) > 20) and (isFanOn is False) and (keepFanOff is False)):
         message = 'Subject: Temperature Alert\n\nThe temperature of your room is {}, would you like to turn on the fan?\nYou have 1 minute to answer. '.format(temp)
         #send the email
         smtpobject.sendmail(email_sender, email_receiver, message)
         time.sleep(2)
         isFanOn = checkEmailReply()
-        if (isFanOn):
-            #the fan will not be able to be turned on through the button
-            #check if the turn off button was clicked
-            if ("turnOffFan" == ctx.triggered_id):
-                isFanOn = False
-                keepFanOff = True
-                #GPIO.output(motor_enable,GPIO.LOW
-                return ('/assets/fan_off.png', temp, humi)
-            else:
-                #fan is still on
-                return ('/assets/fan_on.png', temp, humi)
-        else:
-            #if fan is off
-            return ('/assets/fan_off.png', temp, humi)
+        
+    if (isFanOn and (n_clicks == 0)):
+        #the fan can only be turned off through the button
+        return('/assets/fan_on.png', temp, humi)
+    else:
+        #make sure fan is off
+        GPIO.output(motor_enable,GPIO.LOW)
+        return('/assets/fan_off.png', temp, humi)
    
 @app.callback(
         Output('mqtt', 'message'),
