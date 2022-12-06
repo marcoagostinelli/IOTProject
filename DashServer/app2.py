@@ -7,6 +7,7 @@ import smtplib # to send email
 from imap_tools import MailBox, AND # to receive email
 import time
 import dash_mqtt
+import paho.mqtt.client as mqtt
 
 app = Dash(__name__)
 
@@ -19,6 +20,7 @@ server = 'smtp.gmail.com'
 inbox_server = 'imap.gmail.com'
 homehtml = 'home.html'
 timer = time.time() + 60
+lightresult = 0
 
 #MQTT mosquitto server and portt
 TEST_SERVER = '192.168.149.60'
@@ -170,6 +172,25 @@ def checkEmailReply():
     GPIO.output(motor_enable, GPIO.HIGH)
     GPIO.output(motor_turn, GPIO.HIGH)
     return True
-        
+
+# The callback for when the client receives a CONNACK response from the server.
+def on_connect(client, userdata, flags, rc):
+    print("Connected with result code "+str(rc))
+
+    # Subscribing in on_connect() means that if we lose the connection and
+    # reconnect then subscriptions will be renewed.
+    client.subscribe("IoTlab/photoValue")
+
+def on_message(client, userdata, msg):
+    #print(str(msg.payload))
+    lightresult = float(msg.payload.decode("utf-8"))
+    print(lightresult)
+    return lightresult
+    
 if __name__ == "__main__":
+    client = mqtt.Client()
+    client.connect("0.0.0.0", 1883)
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.loop_start()
     app.run_server(debug=True)
