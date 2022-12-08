@@ -7,6 +7,7 @@ import smtplib # to send email
 import time
 import dash_mqtt
 import paho.mqtt.client as mqtt
+import imaplib, email
 
 app = Dash(__name__)
 
