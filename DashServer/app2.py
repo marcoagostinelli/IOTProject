@@ -66,7 +66,7 @@ app.layout = html.Div(
                     value=0,
                     label="Current Temperature",
                     labelPosition='top',
-                    max=50 
+                    max=30 
                     ) ,
                     html.Button(
                         style={'margin-top':'50px'}, 
