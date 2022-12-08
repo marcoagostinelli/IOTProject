@@ -36,6 +36,7 @@ isFanOn = False
 motor_enable = 15; #GPIO 22
 motor_turn = 13; #GPIO 27
 hasEmailSent = False
+hasReplied = False
 
 
 
@@ -65,13 +66,14 @@ def get_emails(result_bytes):
 
 #only look at emails from one person
 msgs = get_emails(search('FROM', 'iottest031@gmail.com', con))
+con.logout()
 #note the size of the inbox before functions are called
 inboxSize = len(msgs)
 
 app.layout = html.Div(
     style={'background-image': 'url("/assets/background.jpg")', 'background-size': 'cover', 'width': '100%', 'height': '100%','position': 'fixed'},
     children=[
-        dcc.Interval(id = "time", interval = 1000, n_intervals = 0),
+        dcc.Interval(id = "time", interval = 3000),
         html.H1(children="IOT Dashboard"),
             html.Div(
                 style={'width':'100px', 'float':'left', 'margin-left':'450px','padding':'10px'},
@@ -135,8 +137,10 @@ app.layout = html.Div(
     Input('turnOffFan', 'n_clicks')
 )
 def getTemp(data, n_clicks):
-    global isFanOn
     global hasEmailSent
+    global hasReplied
+    global con
+    global isFanOn
     #dht.readDHT11()
     #temp = dht.temperature
     temp = 24
@@ -144,51 +148,65 @@ def getTemp(data, n_clicks):
     humi = 50
     #if the temp is over 22 and an email has not been sent, send an email
     if ((float(temp) > 22) and (hasEmailSent is False)):
-        message = 'Subject: Temperature Alert\n\nThe temperature of your room is {}, would you like to turn on the fan?\nAnswer YES '.format(temp)
+        message = 'Subject: Temperature Alert\n\nThe temperature of your room is {}, would you like to turn on the fan?\n'.format(temp)
         #send the email
         smtpobject.sendmail(email_sender, email_receiver, message)
         print("email sent")
         hasEmailSent = True
         return('/assets/fan_off.png', temp, humi)
-
+    
     #constantly check for email reply. refresh inbox and check if the size has changed
-    con.recent()
+
+    con = imaplib.IMAP4_SSL(server)
+    con.login(email_sender, sender_password)
+    con.select("INBOX")
     updatedInbox = get_emails(search('FROM', 'iottest031@gmail.com', con))
+    con.logout()
+    
+
     #while there is no reply, keep checking, and keep fan off
+
     if(inboxSize == len(updatedInbox)):
-        print(updatedInbox)
         return('/assets/fan_off.png', temp, humi)
+    
 
     #if there is a reply, check if the user said yes
-    if (checkEmailReply(updatedInbox)):
+    if ((hasReplied is False) and checkEmailReply(updatedInbox)):
         return ('/assets/fan_on.png', temp, humi)
+    elif(hasReplied is False) and (checkEmailReply(updatedInbox) is False):
+        return('/assets/fan_off.png', temp, humi)
+    
+    if (isFanOn and (n_clicks == 0)):
+        #the fan can only be turned off through the button
+        return('/assets/fan_on.png', temp, humi)
     else:
+        #make sure fan is off
+        isFanOn = False
+        #GPIO.output(motor_enable,GPIO.LOW)
         return('/assets/fan_off.png', temp, humi)
 
-    # if (isFanOn and (n_clicks == 0)):
-    #     #the fan can only be turned off through the button
-    #     return('/assets/fan_on.png', temp, humi)
-    # else:
-    #     #make sure fan is off
-    #     isFanOn = False
-    #     #GPIO.output(motor_enable,GPIO.LOW)
-    #     return('/assets/fan_off.png', temp, humi)
+    return ('/assets/fan_off.png', temp, humi)    
                          
             
 def checkEmailReply(inbox):
+    global hasReplied
+    global isFanOn
     print("checking reply")
+    hasReplied = True
     #Once the sender has received a reply from the user, check if the user said yes
     #get the most recent email
     msg = inbox[len(inbox)-1]
     #get the body of the email
     body = get_body(email.message_from_bytes(msg[0][1]))
     #if the user said yes, turn on the fan
-    if ("YES" in str(body)):
+    if ("yes" in str(body)):
         #GPIO.output(motor_enable,GPIO.HIGH)
         #GPIO.output(motor_turn,GPIO.HIGH)
         isFanOn = True
+        print("user replied yes")
         return True
     else:
+        print("user did not reply yes")
         return False
 
 
