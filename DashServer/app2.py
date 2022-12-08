@@ -4,7 +4,6 @@ import dash_daq as daq
 import RPi.GPIO as GPIO
 import Freenove_DHT as DHT
 import smtplib # to send email
-from imap_tools import MailBox, AND # to receive email
 import time
 import dash_mqtt
 import paho.mqtt.client as mqtt
@@ -35,8 +34,10 @@ smtpobject = smtplib.SMTP(server, 587)
 smtpobject.starttls()
 smtpobject.login(email_sender,sender_password)
 
-#login to the inbox
-mb = MailBox(inbox_server).login(email_sender, sender_password)
+#login to the sender inbox
+con = imaplib.IMAP4_SSL(server)
+con.login(email_sender, sender_password)
+con.select("INBOX")
 
 #tpin -> DHT11
 tpin = 35; #GPIO 19
@@ -45,6 +46,38 @@ motor_turn = 13; #GPIO 27
 isFanOn = False
 #keepFanOff will be true if the user manually turned off the fan (the fan will no longer turn on by itself)
 keepFanOff = False
+hasEmailSent = False
+hasReplied = False
+
+#some functions to help with reading emails
+#gets the body of the email
+def get_body(msg):
+    if msg.is_multipart():
+        return get_body(msg.get_payload(0))
+    else:
+        return msg.get_payload(None, True)
+
+#searches for emails with a specific key and value (from a specific person)
+def search(key, value, con):
+    result, data = con.search(None, key, '"{}"'.format(value))
+    return data
+
+#gets all the emails from the inbox
+def get_emails(result_bytes):
+    msgs = []
+    for num in result_bytes[0].split():
+        typ, data = con.fetch(num, '(RFC822)')
+        msgs.append(data)
+    return msgs
+
+#only look at emails from one person
+msgs = get_emails(search('FROM', 'iottest031@gmail.com', con))
+con.logout()
+#note the size of the inbox before functions are called
+inboxSize = len(msgs)
+
+
+
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BOARD)
@@ -56,7 +89,7 @@ GPIO.output(motor_enable, GPIO.LOW)
 app.layout = html.Div(
     style={'background-image': 'url("/assets/background.jpg")', 'background-size': 'cover', 'width': '100%', 'height': '100%','position': 'fixed'},
     children=[
-        dcc.Interval(id = "time"),
+        dcc.Interval(id = "time", interval = 3000),
         html.H1(children="IOT Dashboard"),
             html.Div(
                 style={'width':'100px', 'float':'left', 'margin-left':'450px','padding':'10px'},
@@ -66,7 +99,7 @@ app.layout = html.Div(
                     value=0,
                     label="Current Temperature",
                     labelPosition='top',
-                    max=50 
+                    max=30 
                     ) ,
                     html.Button(
                         style={'margin-top':'50px'}, 
@@ -121,28 +154,58 @@ app.layout = html.Div(
 )
 
 def getTemp(data,n_clicks):
+    global hasEmailSent
+    global hasReplied
+    global con
     global isFanOn
-    global keepFanOff
     #get button info
     dht.readDHT11()
     temp = dht.temperature
     humi = dht.humidity
     print ("temp is :",temp)
     #if the temp is over 22, send the user a notice
-    if ((float(temp) > 20) and (isFanOn is False) and (keepFanOff is False)):
-        message = 'Subject: Temperature Alert\n\nThe temperature of your room is {}, would you like to turn on the fan?\nYou have 1 minute to answer. '.format(temp)
+    if ((float(temp) > 22) and (hasEmailSent is False)):
+        message = 'Subject: Temperature Alert\n\nThe temperature of your room is {}, would you like to turn on the fan?\n'.format(temp)
         #send the email
         smtpobject.sendmail(email_sender, email_receiver, message)
-        time.sleep(2)
-        isFanOn = checkEmailReply()
+        hasEmailSent = True
+        return('/assets/fan_off.png', temp, humi)
         
+    #constantly check for email reply. refresh inbox and check if the size has changed
+
+    con = imaplib.IMAP4_SSL(server)
+    con.login(email_sender, sender_password)
+    con.select("INBOX")
+    updatedInbox = get_emails(search('FROM', 'iottest031@gmail.com', con))
+    con.logout()
+    
+
+    #while there is no reply, keep checking, and keep fan off
+
+    if(inboxSize == len(updatedInbox)):
+        return('/assets/fan_off.png', temp, humi)
+    
+
+    #if there is a reply, check if the user said yes
+    if ((hasReplied is False) and checkEmailReply(updatedInbox)):
+        GPIO.output(motor_enable,GPIO.HIGH)
+        GPIO.output(motor_turn,GPIO.HIGH)
+        return ('/assets/fan_on.png', temp, humi)
+    elif(hasReplied is False) and (checkEmailReply(updatedInbox) is False):
+        return('/assets/fan_off.png', temp, humi)
+    
+    #check button status
     if (isFanOn and (n_clicks == 0)):
         #the fan can only be turned off through the button
         return('/assets/fan_on.png', temp, humi)
     else:
         #make sure fan is off
+        isFanOn = False
         GPIO.output(motor_enable,GPIO.LOW)
+        GPIO.output(motor_turn,GPIO.LOW)
         return('/assets/fan_off.png', temp, humi)
+
+    return ('/assets/fan_off.png', temp, humi) 
    
 @app.callback(
         Output('mqtt', 'message'),
@@ -161,17 +224,26 @@ def display_output(n_clicks, message_payload):
             'payload' : ""
         }
 
-def checkEmailReply():
+def checkEmailReply(inbox):
+    global hasReplied
     global isFanOn
-    #search for an email regarding the temature
-    messages = mb.fetch(criteria=AND(subject='Temperature Alert', body='YES', from_= email_receiver))
-    #this will contain YES if user resonded, or will be empty if they didnt
-    
-    #auto reply is set to YES so the fan will always turn on
-    print('turn on fan')
-    GPIO.output(motor_enable, GPIO.HIGH)
-    GPIO.output(motor_turn, GPIO.HIGH)
-    return True
+    print("checking reply")
+    hasReplied = True
+    #Once the sender has received a reply from the user, check if the user said yes
+    #get the most recent email
+    msg = inbox[len(inbox)-1]
+    #get the body of the email
+    body = get_body(email.message_from_bytes(msg[0][1]))
+    #if the user said yes, turn on the fan
+    if ("yes" in str(body)):
+        GPIO.output(motor_enable,GPIO.HIGH)
+        GPIO.output(motor_turn,GPIO.HIGH)
+        isFanOn = True
+        print("user replied yes")
+        return True
+    else:
+        print("user did not reply yes")
+        return False
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
