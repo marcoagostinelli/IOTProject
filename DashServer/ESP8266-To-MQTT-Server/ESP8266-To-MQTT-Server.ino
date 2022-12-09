@@ -13,9 +13,9 @@ MFRC522 rfid(SS_PIN, RST_PIN); // Instance of the class
 MFRC522::MIFARE_Key key;
 // Init array that will store new NUID
 
-const char* ssid = "station3";
-const char* password = "justdoitnow5";
-const char* mqtt_server = "192.168.2.124";
+const char* ssid = "yourIP";
+const char* password = "yourPassword";
+const char* mqtt_server = "ip";
 
 byte nuidPICC[4];
 bool newCard = true;
@@ -96,6 +96,13 @@ void loop() {
     dtostrf(sensorValue,6,2,photoArr);
 
     client.publish("IoTlab/photoValue", photoArr);
+    if (sensorValue <= 400){
+      digitalWrite(LED, HIGH);
+      client.publish("IoTlab/lightStatus", "ON");
+      }else {
+        digitalWrite(LED, LOW);
+        client.publish("IoTlab/lightStatus", "OFF");
+      }
     delay(1000);
     //  client.publish("device/alh",hh);
           
