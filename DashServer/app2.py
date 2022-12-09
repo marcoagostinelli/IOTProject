@@ -8,6 +8,7 @@ import time
 import dash_mqtt
 import paho.mqtt.client as mqtt
 import imaplib, email
+import sqlite3
 
 app = Dash(__name__)
 
@@ -49,6 +50,47 @@ isFanOn = False
 keepFanOff = False
 hasEmailSent = False
 hasReplied = False
+RFID = 2
+
+try:
+    #connection_obj = sqlite3.connect('IoTdb.db')
+    print("Info has been added")
+    #cursor_obj = connection_obj.cursor()
+    #connection_obj.execute("""CREATE TABLE users(UserId int,Profile varchar(100),RFID varchar(100),Lightdb int,Tempdb int,Humdb int);""")
+  
+    #connection_obj.execute(
+    #    """INSERT INTO users (UserId,Profile,RFID,Lightdb,Tempdb,Humdb) VALUES (1,"TestPro1","0",1,1,1)""")
+  
+    #connection_obj.commit()
+  
+# Close the connection
+    #connection_obj.close()
+except:
+    print("Information has been rejected")
+    
+connection_obj = sqlite3.connect('IoTdb.db')
+# cursor object
+cursor_obj = connection_obj.cursor()
+  
+# to select all column we will use
+  
+cursor_obj.execute('SELECT * FROM users WHERE RFID = ?', (RFID, ))
+  
+print("All the data")
+output = cursor_obj.fetchall()
+for row in output:
+  print(row)
+  UserId = row[0]
+  Profile = row[1]
+  Lightdb = row[3]
+  Tempdb = row[4]
+  Humdb = row[5]
+print(UserId)
+  
+connection_obj.commit()
+  
+# Close the connection
+connection_obj.close()
 
 #some functions to help with reading emails
 #gets the body of the email
@@ -123,6 +165,7 @@ app.layout = html.Div(
         html.Br(),
         html.Br(),
         html.Br(),
+        html.H1(children="Welcome Back, " + Profile),
         html.Div(
             style={'margin-left':'800px'},
             children=[
@@ -165,7 +208,7 @@ def getTemp(data,n_clicks):
     humi = dht.humidity
     print ("temp is :",temp)
     #if the temp is over 22, send the user a notice
-    if ((float(temp) > 22) and (hasEmailSent is False)):
+    if ((float(temp) > Tempdb) and (hasEmailSent is False)):
         message = 'Subject: Temperature Alert\n\nThe temperature of your room is {}, would you like to turn on the fan?\n'.format(temp)
         #send the email
         smtpobject.sendmail(email_sender, email_receiver, message)
@@ -258,6 +301,7 @@ def on_message(client, userdata, msg):
     #print(str(msg.payload))
     lightresult = float(msg.payload.decode("utf-8"))
     print(lightresult)
+    
     return lightresult
     
 if __name__ == "__main__":
