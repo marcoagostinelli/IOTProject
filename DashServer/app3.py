@@ -256,23 +256,33 @@ def on_connect(client, userdata, flags, rc):
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     client.subscribe("IoTlab/photoValue")
+    client.subscribe("IoTlab/lightStatus")
 
 def on_message(client, userdata, msg):
     global hasLEDEmailSent
     global lightresult
-    lightresult = float(msg.payload.decode("utf-8"))
-    date = time.strftime('%d/%m/%Y %H:%M:%S')
-    print(lightresult)
-    if (lightresult <= 400) and (hasLEDEmailSent is False):
-        GPIO.output(led_pin,GPIO.HIGH)
-        message = 'Subject: The Light is ON at {}\n'.format(date) #, date)
-        #send the email
-        smtpobject.sendmail(email_sender, email_receiver, message)
-        hasLEDEmailSent = True
-        sleep(3)
-    else:
-        GPIO.output(led_pin,GPIO.LOW)
-        #sleep(3)
+    if('lightStatus' in msg.topic){
+        lightStatus = str(msg.payload.decode("utf-8"))
+        if(lightStatus == "ON"){
+            #turn on light icons
+            print(lightStatus)
+        }else{
+            #turn off light icons
+            print(lightStatus)
+        }
+    }
+    
+    if ('photoValue' in msg.topic){
+        lightresult = float(msg.payload.decode("utf-8"))
+        date = time.strftime('%d/%m/%Y %H:%M:%S')
+        print(lightresult)
+        if (lightresult <= 400) and (hasLEDEmailSent is False):
+            message = 'Subject: The Light is ON at {}\n'.format(date) #, date)
+            #send the email
+            smtpobject.sendmail(email_sender, email_receiver, message)
+            hasLEDEmailSent = True
+            sleep(3)
+    }
     return lightresult
     
 if __name__ == "__main__":
