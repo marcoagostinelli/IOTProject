@@ -145,7 +145,7 @@ app.layout = html.Div(
         value=0,
         backgroundColor="#000000"
         ),
-        html.Img(src='/assets/light_off.png', id="led", style={'margin-left':'auto','margin-right':'auto','display':'block'})
+        html.Img(src='/assets/light_off.PNG', id="led", style={'margin-left':'auto','margin-right':'auto','display':'block'})
         ]
     )
 
@@ -166,12 +166,15 @@ def displayData(data,n_clicks):
     global isFanOn
     global lightresult
     global LEDStatus
+    #the default state of ledImage
+    ledImage = '/assets/light_off.PNG'
 
     #assign the correct image based on LEDStatus
+    print(LEDStatus)
     if (LEDStatus is True):
         ledImage = '/assets/light_on.png'
     else:
-        ledImage = '/assets/light_off.png'
+        ledImage = '/assets/light_off.PNG'
         
     #get button info
     dht.readDHT11()
@@ -184,7 +187,7 @@ def displayData(data,n_clicks):
         #send the email
         smtpobject.sendmail(email_sender, email_receiver, message)
         hasEmailSent = True
-        return('/assets/fan_off.png', temp, humi,lightresult)
+        return('/assets/fan_off.png', temp, humi,lightresult,ledImage)
         
     #constantly check for email reply. refresh inbox and check if the size has changed
 
@@ -198,29 +201,29 @@ def displayData(data,n_clicks):
     #while there is no reply, keep checking, and keep fan off
 
     if(inboxSize == len(updatedInbox)):
-        return('/assets/fan_off.png', temp, humi, lightresult)
+        return('/assets/fan_off.png', temp, humi, lightresult,ledImage)
     
 
     #if there is a reply, check if the user said yes
     if ((hasReplied is False) and checkEmailReply(updatedInbox)):
         GPIO.output(motor_enable,GPIO.HIGH)
         GPIO.output(motor_turn,GPIO.HIGH)
-        return ('/assets/fan_on.png', temp, humi, lightresult)
+        return ('/assets/fan_on.png', temp, humi, lightresult,ledImage)
     elif(hasReplied is False) and (checkEmailReply(updatedInbox) is False):
-        return('/assets/fan_off.png', temp, humi, lightresult)
+        return('/assets/fan_off.png', temp, humi, lightresult,ledImage)
     
     #check button status
     if (isFanOn and (n_clicks == 0)):
         #the fan can only be turned off through the button
-        return('/assets/fan_on.png', temp, humi, lightresult)
+        return('/assets/fan_on.png', temp, humi, lightresult,ledImage)
     else:
         #make sure fan is off
         isFanOn = False
         GPIO.output(motor_enable,GPIO.LOW)
         GPIO.output(motor_turn,GPIO.LOW)
-        return('/assets/fan_off.png', temp, humi, lightresult)
+        return('/assets/fan_off.png', temp, humi, lightresult,ledImage)
 
-    return ('/assets/fan_off.png', temp, humi, lightresult) 
+    return ('/assets/fan_off.png', temp, humi, lightresult,ledImage) 
    
 @app.callback(
         Output('mqtt', 'message'),
