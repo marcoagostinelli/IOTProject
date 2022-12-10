@@ -37,7 +37,9 @@ motor_enable = 15; #GPIO 22
 motor_turn = 13; #GPIO 27
 hasEmailSent = False
 hasReplied = False
-
+hasLEDEmailSent = False
+lightresult = 405
+LEDStatus = False
 
 
 #GPIO.setup(motor_enable,GPIO.OUT)
@@ -119,13 +121,13 @@ app.layout = html.Div(
             ]
         ),
         html.Br(),
-        daq.GraduatedBar(
-        style={'left':'50%'},
+        daq.LEDDisplay(
         id='intensity',
         label="Light Intensity",
-        max=100,
-        value=0
-        )
+        value=0,
+        backgroundColor="#000000"
+        ),
+        html.Img(src='/assets/light_off.png', id="led", style={'margin-left':'auto','margin-right':'auto','display':'block'})
         ]
     )
 
@@ -133,14 +135,24 @@ app.layout = html.Div(
     Output('fan','src'),
     Output('temperature','value'),
     Output('humidity','value'),
+    Output('intensity','value'),
+    Output('led','src'),
     Input('time', 'n_intervals'),
     Input('turnOffFan', 'n_clicks')
 )
-def getTemp(data, n_clicks):
+def displayData(data, n_clicks):
     global hasEmailSent
     global hasReplied
     global con
     global isFanOn
+    global lightresult
+    global LEDStatus
+
+    #assign the correct image based on LEDStatus
+    if (LEDStatus is True):
+        ledImage = '/assets/light_on.png'
+    else:
+        ledImage = '/assets/light_off.png'
     #dht.readDHT11()
     #temp = dht.temperature
     temp = 24
@@ -153,7 +165,7 @@ def getTemp(data, n_clicks):
         smtpobject.sendmail(email_sender, email_receiver, message)
         print("email sent")
         hasEmailSent = True
-        return('/assets/fan_off.png', temp, humi)
+        return('/assets/fan_off.png', temp, humi, lightresult, ledImage)
     
     #constantly check for email reply. refresh inbox and check if the size has changed
 
@@ -167,25 +179,25 @@ def getTemp(data, n_clicks):
     #while there is no reply, keep checking, and keep fan off
 
     if(inboxSize == len(updatedInbox)):
-        return('/assets/fan_off.png', temp, humi)
+        return('/assets/fan_off.png', temp, humi, lightresult, ledImage)
     
 
     #if there is a reply, check if the user said yes
     if ((hasReplied is False) and checkEmailReply(updatedInbox)):
-        return ('/assets/fan_on.png', temp, humi)
+        return ('/assets/fan_on.png', temp, humi, lightresult, ledImage)
     elif(hasReplied is False) and (checkEmailReply(updatedInbox) is False):
-        return('/assets/fan_off.png', temp, humi)
+        return('/assets/fan_off.png', temp, humi, lightresult, ledImage)
     
     if (isFanOn and (n_clicks == 0)):
         #the fan can only be turned off through the button
-        return('/assets/fan_on.png', temp, humi)
+        return('/assets/fan_on.png', temp, humi, lightresult, ledImage)
     else:
         #make sure fan is off
         isFanOn = False
         #GPIO.output(motor_enable,GPIO.LOW)
-        return('/assets/fan_off.png', temp, humi)
+        return('/assets/fan_off.png', temp, humi, lightresult, ledImage)
 
-    return ('/assets/fan_off.png', temp, humi)    
+    return ('/assets/fan_off.png', temp, humi, lightresult, ledImage)    
                          
             
 def checkEmailReply(inbox):

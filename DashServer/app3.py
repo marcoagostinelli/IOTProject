@@ -52,6 +52,7 @@ hasEmailSent = False
 hasReplied = False
 hasLEDEmailSent = False
 lightresult = 0
+LEDStatus = False
 
 #some functions to help with reading emails
 #gets the body of the email
@@ -143,7 +144,8 @@ app.layout = html.Div(
         label="Light Intensity",
         value=0,
         backgroundColor="#000000"
-        )
+        ),
+        html.Img(src='/assets/light_off.png', id="led", style={'margin-left':'auto','margin-right':'auto','display':'block'})
         ]
     )
 
@@ -152,16 +154,25 @@ app.layout = html.Div(
     Output('temperature','value'),
     Output('humidity','value'),
     Output('intensity','value'),
+    Output('led','src'),
     Input('time', 'n_intervals'),
     Input('turnOffFan', 'n_clicks')
 )
 
-def getTemp(data,n_clicks):
+def displayData(data,n_clicks):
     global hasEmailSent
     global hasReplied
     global con
     global isFanOn
     global lightresult
+    global LEDStatus
+
+    #assign the correct image based on LEDStatus
+    if (LEDStatus is True):
+        ledImage = '/assets/light_on.png'
+    else:
+        ledImage = '/assets/light_off.png'
+        
     #get button info
     dht.readDHT11()
     temp = dht.temperature
@@ -260,6 +271,7 @@ def on_connect(client, userdata, flags, rc):
 def on_message(client, userdata, msg):
     global hasLEDEmailSent
     global lightresult
+    global LEDStatus
     lightresult = float(msg.payload.decode("utf-8"))
     date = time.strftime('%d/%m/%Y %H:%M:%S')
     print(lightresult)
@@ -269,9 +281,15 @@ def on_message(client, userdata, msg):
         #send the email
         smtpobject.sendmail(email_sender, email_receiver, message)
         hasLEDEmailSent = True
+        LEDStatus = True
         sleep(3)
+    #if an email has already been sent but the light must be turned on
+    elif (lightresult <= 400):
+        GPIO.output(led_pin,GPIO.HIGH)
+        LEDStatus = True
     else:
         GPIO.output(led_pin,GPIO.LOW)
+        LEDStatus = False
         #sleep(3)
     return lightresult
     
