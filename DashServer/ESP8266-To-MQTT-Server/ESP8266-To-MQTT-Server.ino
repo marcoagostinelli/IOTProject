@@ -149,15 +149,7 @@ void loop() {
     char RFID2 [RFIDlength];
     client.publish("IoTlab/RFID", RFID.c_str());
     RFID = "";
-    if (sensorValue <= 400){
-      digitalWrite(LED, HIGH);
-      client.publish("IoTlab/lightStatus", "ON");
-      }else {
-        digitalWrite(LED, LOW);
-        client.publish("IoTlab/lightStatus", "OFF");
-      }
     delay(1000);
-    //  client.publish("device/alh",hh);
 }          
   
 

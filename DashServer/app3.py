@@ -338,31 +338,30 @@ def on_message(client, userdata, msg):
     global LEDStatus
     global RFID
     print(msg.payload)
+    date = time.strftime('%d/%m/%Y %H:%M:%S')
+    print(lightresult)
     if('photoValue' in msg.topic):
-        lightresult = float(msg.payload)
+        lightresult = float(msg.payload.decode("utf-8"))
         print(lightresult)
+        if (lightresult <= 400) and (hasLEDEmailSent is False):
+            GPIO.output(led_pin,GPIO.HIGH)
+            message = 'Subject: The Light is ON at {}\n'.format(date) #, date)
+            #send the email
+            smtpobject.sendmail(email_sender, email_receiver, message)
+            hasLEDEmailSent = True
+            LEDStatus = True
+            sleep(3)
+        #if an email has already been sent but the light must be turned on
+        elif (lightresult <= 400):
+            GPIO.output(led_pin,GPIO.HIGH)
+            LEDStatus = True
+        else:
+            GPIO.output(led_pin,GPIO.LOW)
+            LEDStatus = False
     if ('RFID' in msg.topic):
         RFID = str(msg.payload.decode("utf-8"))
         print(RFID)
         db()
-    date = time.strftime('%d/%m/%Y %H:%M:%S')
-    print(lightresult)
-    if (lightresult <= 400) and (hasLEDEmailSent is False):
-        GPIO.output(led_pin,GPIO.HIGH)
-        message = 'Subject: The Light is ON at {}\n'.format(date) #, date)
-        #send the email
-        smtpobject.sendmail(email_sender, email_receiver, message)
-        hasLEDEmailSent = True
-        LEDStatus = True
-        sleep(3)
-    #if an email has already been sent but the light must be turned on
-    elif (lightresult <= 400):
-        GPIO.output(led_pin,GPIO.HIGH)
-        LEDStatus = True
-    else:
-        GPIO.output(led_pin,GPIO.LOW)
-        LEDStatus = False
-        #sleep(3)
     return lightresult
     
 if __name__ == "__main__":
