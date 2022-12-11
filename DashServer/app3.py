@@ -9,6 +9,7 @@ from time import sleep
 import dash_mqtt
 import paho.mqtt.client as mqtt
 import imaplib, email
+import sqlite3
 
 app = Dash(__name__)
 
@@ -29,6 +30,9 @@ TEST_SERVER_PORT = 1883
 #topics
 MESSAGE_OUT_TOPIC = 'IoTlab/photoValue'
 MESSAGE_IN_TOPIC = 'IoTlab/photoValue'
+
+MESSAGE2_OUT_TOPIC = 'IoTlab/RFID'
+MESSAGE2_IN_TOPIC = 'IoTlab/RFID'
 #vanieriot
 
 smtpobject = smtplib.SMTP(server, 587)
@@ -53,7 +57,62 @@ hasReplied = False
 hasLEDEmailSent = False
 lightresult = 0
 LEDStatus = False
+UserId = 0
+Profile = ""
+Lightdb = 0
+Tempdb = 0
+Humdb = 0
+RFID = 2
 
+def db():
+    global UserId
+    global Profile
+    global Lightdb
+    global Tempdb
+    global Humdb
+    try:
+        connection_obj = sqlite3.connect('IoTdb.db')
+        print("Info has been added")
+        cursor_obj = connection_obj.cursor()
+        #connection_obj.execute("""DROP TABLE users""")
+        #connection_obj.execute("""CREATE TABLE users(UserId int,Profile varchar(100),RFID varchar(100),Lightdb int,Tempdb int,Humdb int);""")
+      
+        connection_obj.execute(
+            """INSERT INTO users (UserId,Profile,RFID,Lightdb,Tempdb,Humdb) VALUES (0,"0","Test",0,0,0)""")
+      
+        connection_obj.commit()
+      
+    # Close the connection
+        connection_obj.close()
+    except:
+        print("Information has been rejected")
+        
+    connection_obj = sqlite3.connect('IoTdb.db')
+    # cursor object
+    cursor_obj = connection_obj.cursor()
+      
+    # to select all column we will use
+      
+    cursor_obj.execute('SELECT * FROM users WHERE RFID = ?', (RFID, ))
+      
+    print("All the data")
+    output = cursor_obj.fetchall()
+    for row in output:
+      print(row)
+      UserId = row[0]
+      Profile = row[1]
+      Lightdb = row[3]
+      Tempdb = row[4]
+      Humdb = row[5]
+    print(UserId)
+      
+    connection_obj.commit()
+      
+    # Close the connection
+    connection_obj.close()
+
+#some functions to help with reading emails
+#gets the body of the email
 #some functions to help with reading emails
 #gets the body of the email
 def get_body(msg):
@@ -126,6 +185,7 @@ app.layout = html.Div(
         html.Br(),
         html.Br(),
         html.Br(),
+        html.H1(children="Welcome Back, " + Profile),
         html.Div(
             style={'margin-left':'800px'},
             children=[
@@ -182,7 +242,7 @@ def displayData(data,n_clicks):
     humi = dht.humidity
     print ("temp is :",temp)
     #if the temp is over 22, send the user a notice
-    if ((float(temp) > 22) and (hasEmailSent is False)):
+    if ((float(temp) > tempdb) and (hasEmailSent is False)):
         message = 'Subject: Temperature Alert\n\nThe temperature of your room is {}, would you like to turn on the fan?\n'.format(temp)
         #send the email
         smtpobject.sendmail(email_sender, email_receiver, message)
@@ -270,12 +330,21 @@ def on_connect(client, userdata, flags, rc):
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     client.subscribe("IoTlab/photoValue")
+    client.subscribe("IoTlab/RIFD")
 
 def on_message(client, userdata, msg):
     global hasLEDEmailSent
     global lightresult
     global LEDStatus
-    lightresult = float(msg.payload.decode("utf-8"))
+    global RFID
+    print(msg.payload)
+    if('photoValue' in msg.topic):
+        lightresult = float(msg.payload)
+        print(lightresult)
+    if ('RFID' in msg.topic):
+        RFID = str(msg.payload.decode("utf-8"))
+        print(RFID)
+        db()
     date = time.strftime('%d/%m/%Y %H:%M:%S')
     print(lightresult)
     if (lightresult <= 400) and (hasLEDEmailSent is False):

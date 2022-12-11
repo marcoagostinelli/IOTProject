@@ -13,9 +13,11 @@ MFRC522 rfid(SS_PIN, RST_PIN); // Instance of the class
 MFRC522::MIFARE_Key key;
 // Init array that will store new NUID
 
-const char* ssid = "station3";
-const char* password = "justdoitnow5";
-const char* mqtt_server = "192.168.2.124";
+const char* ssid = "";
+const char* password = "";
+const char* mqtt_server = "";
+
+String RFID = "";
 
 byte nuidPICC[4];
 bool newCard = true;
@@ -33,7 +35,7 @@ void setup_wifi() {
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
+    Serial.println("Not connected");
   }
   Serial.println("");
   Serial.print("WiFi connected - ESP-8266 IP address: ");
@@ -84,21 +86,6 @@ void setup() {
 }
 
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
-  if(!client.loop())
-    client.connect("vanieriot");
-    
-    int sensorValue = analogRead(A0);
-
-    char photoArr [8];
-    dtostrf(sensorValue,6,2,photoArr);
-
-    client.publish("IoTlab/photoValue", photoArr);
-    delay(1000);
-    //  client.publish("device/alh",hh);
-          
   if ( ! rfid.PICC_IsNewCardPresent())
     return;
   // Verify if the NUID has been readed
@@ -114,7 +101,6 @@ void loop() {
     Serial.println(F("Your tag is not of type MIFARE Classic."));
     return;
   }
-  if (newCard) {
     if (rfid.uid.uidByte[0] != nuidPICC[0] ||
         rfid.uid.uidByte[1] != nuidPICC[1] ||
         rfid.uid.uidByte[2] != nuidPICC[2] ||
@@ -123,7 +109,12 @@ void loop() {
       // Store NUID into nuidPICC array
       for (byte i = 0; i < 4; i++) {
         nuidPICC[i] = rfid.uid.uidByte[i];
-      }
+        String temp = String(rfid.uid.uidByte[i], HEX);
+        RFID += temp;
+      } 
+      Serial.print("Stored: ");
+      Serial.print(RFID);
+      Serial.println();
       Serial.println(F("The NUID tag is:"));
       Serial.print(F("In hex: "));
       printHex(rfid.uid.uidByte, rfid.uid.size);
@@ -133,36 +124,42 @@ void loop() {
       Serial.println();
       newCard = false;
     }
-    //else Serial.println(F("Card read previously."));
-    // Halt PICC
-    //rfid.PICC_HaltA();
-    // Stop encryption on PCD
-    //rfid.PCD_StopCrypto1();
-  }
-  else
-    if (rfid.uid.uidByte[0] != nuidPICC[0] ||
-        rfid.uid.uidByte[1] != nuidPICC[1] ||
-        rfid.uid.uidByte[2] != nuidPICC[2] ||
-        rfid.uid.uidByte[3] != nuidPICC[3] ) {
-      Serial.println(F("Incorrect card"));
-      Serial.println(F("The NUID tag is:"));
-      Serial.print(F("In hex: "));
-      printHex(rfid.uid.uidByte, rfid.uid.size);
-      Serial.println();
-      Serial.print(F("In dec: "));
-      printDec(rfid.uid.uidByte, rfid.uid.size);
-      Serial.println();
-    }
     else Serial.println(F("Card read previously."));
     // Halt PICC
     rfid.PICC_HaltA();
     // Stop encryption on PCD
     rfid.PCD_StopCrypto1();
-    correctCard();
-
+  
   delay(5000);
     // Reset the loop if no new card present on the sensor/reader. This saves the entire process when  idle.  
+  
+  if (!client.connected()) {
+    reconnect();
   }
+  if(!client.loop())
+    client.connect("vanieriot");
+    
+    int sensorValue = analogRead(A0);
+
+    char photoArr [8];
+    dtostrf(sensorValue,6,2,photoArr);
+
+    client.publish("IoTlab/photoValue", photoArr);
+    int RFIDlength = RFID.length() + 1;
+    char RFID2 [RFIDlength];
+    client.publish("IoTlab/RFID", RFID.c_str());
+    RFID = "";
+    if (sensorValue <= 400){
+      digitalWrite(LED, HIGH);
+      client.publish("IoTlab/lightStatus", "ON");
+      }else {
+        digitalWrite(LED, LOW);
+        client.publish("IoTlab/lightStatus", "OFF");
+      }
+    delay(1000);
+    //  client.publish("device/alh",hh);
+}          
+  
 
 void printHex(byte *buffer, byte bufferSize) {
   for (byte i = 0; i < bufferSize; i++) {
