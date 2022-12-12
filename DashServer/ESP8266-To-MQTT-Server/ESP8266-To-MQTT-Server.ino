@@ -86,51 +86,61 @@ void setup() {
 }
 
 void loop() {
-  if ( ! rfid.PICC_IsNewCardPresent())
-    return;
-  // Verify if the NUID has been readed
-  if ( ! rfid.PICC_ReadCardSerial())
-    return;
-  Serial.print(F("PICC type: "));
-  MFRC522::PICC_Type piccType = rfid.PICC_GetType(rfid.uid.sak);
-  Serial.println(rfid.PICC_GetTypeName(piccType));
-  // Check is the PICC of Classic MIFARE type
-  if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&
-      piccType != MFRC522::PICC_TYPE_MIFARE_1K &&
-      piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
-    Serial.println(F("Your tag is not of type MIFARE Classic."));
-    return;
-  }
-    if (rfid.uid.uidByte[0] != nuidPICC[0] ||
-        rfid.uid.uidByte[1] != nuidPICC[1] ||
-        rfid.uid.uidByte[2] != nuidPICC[2] ||
-        rfid.uid.uidByte[3] != nuidPICC[3] ) {
-      Serial.println(F("A new card has been detected."));
-      // Store NUID into nuidPICC array
-      for (byte i = 0; i < 4; i++) {
-        nuidPICC[i] = rfid.uid.uidByte[i];
-        String temp = String(rfid.uid.uidByte[i], HEX);
-        RFID += temp;
-      } 
-      Serial.print("Stored: ");
-      Serial.print(RFID);
-      Serial.println();
-      Serial.println(F("The NUID tag is:"));
-      Serial.print(F("In hex: "));
-      printHex(rfid.uid.uidByte, rfid.uid.size);
-      Serial.println();
-      Serial.print(F("In dec: "));
-      printDec(rfid.uid.uidByte, rfid.uid.size);
-      Serial.println();
+  while (newCard) {
+    if ( ! rfid.PICC_IsNewCardPresent()) {
       newCard = false;
+      break;
     }
-    else Serial.println(F("Card read previously."));
-    // Halt PICC
-    rfid.PICC_HaltA();
-    // Stop encryption on PCD
-    rfid.PCD_StopCrypto1();
-  
-  delay(5000);
+    // Verify if the NUID has been readed
+    if ( ! rfid.PICC_ReadCardSerial()) {
+      newCard = false;
+      break;
+    }
+    Serial.print(F("PICC type: "));
+    MFRC522::PICC_Type piccType = rfid.PICC_GetType(rfid.uid.sak);
+    Serial.println(rfid.PICC_GetTypeName(piccType));
+    // Check is the PICC of Classic MIFARE type
+    if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&
+        piccType != MFRC522::PICC_TYPE_MIFARE_1K &&
+        piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
+      Serial.println(F("Your tag is not of type MIFARE Classic."));
+      newCard = false;
+      break;
+    }
+      if (rfid.uid.uidByte[0] != nuidPICC[0] ||
+          rfid.uid.uidByte[1] != nuidPICC[1] ||
+          rfid.uid.uidByte[2] != nuidPICC[2] ||
+          rfid.uid.uidByte[3] != nuidPICC[3] ) {
+        Serial.println(F("A new card has been detected."));
+        // Store NUID into nuidPICC array
+        for (byte i = 0; i < 4; i++) {
+          nuidPICC[i] = rfid.uid.uidByte[i];
+          String temp = String(rfid.uid.uidByte[i], HEX);
+          RFID += temp;
+        } 
+        Serial.print("Stored: ");
+        Serial.print(RFID);
+        Serial.println();
+        Serial.println(F("The NUID tag is:"));
+        Serial.print(F("In hex: "));
+        printHex(rfid.uid.uidByte, rfid.uid.size);
+        Serial.println();
+        Serial.print(F("In dec: "));
+        printDec(rfid.uid.uidByte, rfid.uid.size);
+        Serial.println();
+        newCard = false;
+      }
+      else Serial.println(F("Card read previously."));
+      // Halt PICC
+      rfid.PICC_HaltA();
+      // Stop encryption on PCD
+      rfid.PCD_StopCrypto1();
+      if (newCard) {
+        break;
+      }
+    
+    delay(5000);
+    }
     // Reset the loop if no new card present on the sensor/reader. This saves the entire process when  idle.  
   
   if (!client.connected()) {
@@ -144,12 +154,14 @@ void loop() {
     char photoArr [8];
     dtostrf(sensorValue,6,2,photoArr);
 
-    client.publish("IoTlab/photoValue", photoArr);
     int RFIDlength = RFID.length() + 1;
     char RFID2 [RFIDlength];
-    client.publish("IoTlab/RFID", RFID.c_str());
+    client.publish("IoTlab/RFID", RFID.c_str());     
+    client.publish("IoTlab/photoValue", photoArr);
     RFID = "";
     delay(1000);
+    //  client.publish("device/alh",hh);
+    newCard = true;
 }          
   
 

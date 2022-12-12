@@ -62,7 +62,7 @@ Profile = ""
 Lightdb = 0
 Tempdb = 0
 Humdb = 0
-RFID = 2
+RFID = ""
 
 def db():
     global UserId
@@ -70,17 +70,18 @@ def db():
     global Lightdb
     global Tempdb
     global Humdb
+    global RFID
     try:
-        connection_obj = sqlite3.connect('IoTdb.db')
+        #connection_obj = sqlite3.connect('IoTdb.db')
         print("Info has been added")
-        cursor_obj = connection_obj.cursor()
+        #cursor_obj = connection_obj.cursor()
         #connection_obj.execute("""DROP TABLE users""")
         #connection_obj.execute("""CREATE TABLE users(UserId int,Profile varchar(100),RFID varchar(100),Lightdb int,Tempdb int,Humdb int);""")
       
-        connection_obj.execute(
-            """INSERT INTO users (UserId,Profile,RFID,Lightdb,Tempdb,Humdb) VALUES (0,"0","Test",0,0,0)""")
+        #connection_obj.execute(
+         #   """INSERT INTO users (UserId,Profile,RFID,Lightdb,Tempdb,Humdb) VALUES (1,"Atoz","833463d",450,10,30)""")
       
-        connection_obj.commit()
+        #connection_obj.commit()
       
     # Close the connection
         connection_obj.close()
@@ -330,20 +331,20 @@ def on_connect(client, userdata, flags, rc):
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     client.subscribe("IoTlab/photoValue")
-    client.subscribe("IoTlab/RIFD")
+    client.subscribe("IoTlab/RFID")
 
 def on_message(client, userdata, msg):
     global hasLEDEmailSent
     global lightresult
     global LEDStatus
     global RFID
-    print(msg.payload)
+    global Lightdb
     date = time.strftime('%d/%m/%Y %H:%M:%S')
-    print(lightresult)
+    print(msg.payload.decode("utf-8"))
     if('photoValue' in msg.topic):
         lightresult = float(msg.payload.decode("utf-8"))
-        print(lightresult)
-        if (lightresult <= 400) and (hasLEDEmailSent is False):
+        print(lightresult + float(0))
+        if (lightresult <= Lightdb) and (hasLEDEmailSent is False):
             GPIO.output(led_pin,GPIO.HIGH)
             message = 'Subject: The Light is ON at {}\n'.format(date) #, date)
             #send the email
@@ -352,17 +353,17 @@ def on_message(client, userdata, msg):
             LEDStatus = True
             sleep(3)
         #if an email has already been sent but the light must be turned on
-        elif (lightresult <= 400):
+        elif (lightresult <= Lightdb):
             GPIO.output(led_pin,GPIO.HIGH)
             LEDStatus = True
         else:
             GPIO.output(led_pin,GPIO.LOW)
             LEDStatus = False
-    if ('RFID' in msg.topic):
+    if('RFID' in msg.topic):
+        print(msg.payload.decode("utf-8"))
         RFID = str(msg.payload.decode("utf-8"))
         print(RFID)
         db()
-    return lightresult
     
 if __name__ == "__main__":
     client = mqtt.Client()
